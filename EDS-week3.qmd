@@ -1,0 +1,285 @@
+---
+title: "EDS-week3"
+author: "Sofia"
+format: html
+---
+
+```{r}
+library(sf)
+library(tmap)
+library(tidyverse)
+library(spData)
+```
+
+```{r}
+
+nz <- spData::nz
+nz_height <- spData::nz_height
+
+canterbury <- nz %>%
+  filter(Name=="Canterbury")
+
+tm_shape(nz) +
+  tm_polygons() +
+  tm_shape(canterbury) +
+  tm_fill(col = "darkgrey") +
+  tm_shape(nz_height)+
+  tm_dots(col="red")
+
+```
+
+
+```{r}
+#now we want to subset the points that intersect with canterburry 
+#brackets are a way to indexing
+#before a rose is a come, after is a column 
+
+nz_height[canterburry, ]
+```
+
+
+```{r}
+
+c_height <- nz_height[canterbury, ]
+
+nz_height[canterbury, , op = st_disjoint]
+
+nz_height %>%
+  st_filter(y= canterbury, .predicate = st_intersects)
+
+#creating logical vector based on st_intersects()
+nz_height_sgbp <- st_intersects(x = nz_height, y = canterbury)
+#turning this into a logical, turning itno a true false statement 
+lenghts(nz_height_sgbp) > 0 , true false wether or not the hights intersect with canterburry
+c_height3 <- nz_height[nz_height_logical, ]#then instead of puting cnaterburry inside brakets we put the logical 
+
+
+```
+
+
+```{r}
+
+nz_height_logical <- st_in_within_distance(nz_height, 
+canterbury, 
+                        dist =units::set_units(1000, "km"), 
+                        sparece = FALSE)
+
+c_height4 <- nz_height[nz_height_logical, ]
+```
+
+
+
+```{r}
+#Spatial joins
+
+#for each of this higher points, in which region are they
+#take region name into the hights datasets
+
+
+st_join(nz_hight, nz, join = st_intersects) %>%
+  select(id= t50_fid, elevation, region = Name)#joinin y into x and specyfing which join do you wan to use , x= nz_hight, y= nz
+```
+
+```{r}
+#now how many points are on this region, lo que viene abajo,agregarselo a lo de arriba 
+ group_by(region) %>%
+  summarise(n_points = n()) %>%
+  st_drop_geometry() #for a homework if we want to print out a table
+```
+
+
+```{r}
+#st joins also performs interjoins , left interjoins if you want to do a right, change the order
+#morecomplicated example
+
+cycle_hire <- spData::cycle_hire
+cycle_hire_osm <- spData::cycle_hire_osm
+
+#creating an interactive map
+
+tmap_mode("view")
+
+tm_shape(cycle_hire) +
+  tm_symbols(col="red",alpha = 0.2) + 
+  tm_shape(cycle_hire_osm) +
+  tm_symbols(col= "blue", alpha = 0.2) 
+
+join the blue into the red or opposite
+
+
+```
+
+
+```{r}
+#distance space join
+
+cycle_hire_join <- st_join(cycle_hire, cycle_hire_osm, 
+        st_is_within_distance, 
+        dist = units::set_units(20, "m")) #explicitly telling distance in meters 
+```
+
+```{r}
+if(nrow(cycle_hire) == nrow(cycle_hire_join)) {
+  print("join matches original data dimensions")
+}else {
+  warning("join does not match original data dimensions")
+}
+```
+#Geometry operations
+## Aggregating 
+
+```{r}
+
+us_states <- spData::us_states
+regions <- us_states %>%
+  group_by(REGION) %>%
+  summarise(population = sum(total_pop_15, na.rm =
+                               TRUE))
+tmap_mode("plot")
+tm_shape(us_states) + 
+  tm_polygons()
+
+tm_shape(regions) +
+  tm_polygons()
+
+```
+
+
+```{r}
+us_west <-  us_states[us_states$REGION == "West", ]
+us_west_unions <- st_union(us_west) #creating a region of those two 
+
+
+
+texas <- us_states[us_states$NAME == "Texas", ]
+texas_union <- st_union(us_west_union, texas)
+tm_shape(texas_unions) +
+  tm_polygons()
+```
+
+
+#Buffering 
+```{r}
+
+seine <- spData ::seine
+seine_buffer <- st_buffer(seine, dist = 5000)
+
+tm_shape(seine_buffer) +
+tm_polygons() +  
+tm_shape(seine) +
+  tm_lines()
+```
+```{r}
+#if we want one km tha it is representative of, we use UNION 
+
+
+seine <- spData ::seine
+seine_buffer <- st_buffer(seine, dist = 5000)
+
+seine_union <- st_union(seine_buffer)
+
+tm_shape(seine_union) +
+  tm_polygons()+
+  tm_shape(seine) +
+  tm_lines()
+
+```
+```{r}
+#buffering out all of the points
+
+
+nz_height_buffer <- st_buffer(nz_height, dist = 
+1000000)
+
+#same as st_filter with st_is_within_distance, as this buffer version is including the distance
+
+c_height5 <- nz_height_buffer %>%
+  st_filter(y = canterbury, .predicate = st_intersects)
+
+if(nrow(c_height4) == nrow(c_height5)) {
+  print("results matched")
+} else {
+  warning ("results do not match")
+}
+
+
+
+
+```
+
+
+```{r}
+ x <- st_sfc(st_point(c(0,1))) %>%
+  st_buffer(., dist = 1) %>%
+  st_as_sf()
+
+y <- st_sfc(st_point(c(1,1))) %>%
+  st_buffer(., dist =1) %>%
+st_as_sf
+
+intersection <- st_intersection (x, y)
+difference_x_y <- st_difference (x, y)
+#difference_y_x <- st_difference(y, x)
+#sym_difference <- st_sym_difference (x, y)
+
+bbox <- st_union (x, y)
+
+tm_shape (x, bbox = bbox) + 
+  tm_borders(col = "red") +
+  tm_shape(y) + 
+  tm_borders(col = "blue") + 
+  tm_shape(intersection) + #changing for sym_differene
+  tm_fill(col = "purple")
+
+#x_and_y <- st_intersection(x,y)
+#p_xy1 <- p[x_and_y, ]
+
+#tm_shape(x, bbox= bbox) +
+#tm_borders(col="red") +
+  #tm_shape(y) + 
+  #tm_borders(col= "blue") +
+  #tm_shape(p_xy2) +
+  #tm_dots()
+  
+```
+
+```{r}
+
+bb <- bbox
+box <- st_as_sf(bb) #creating a box to work in 
+p <- st_sample(x = box, size = 100) %>%
+  st_as_sf()
+
+```
+
+#Centroids
+
+```{r}
+
+nz_centroid <- st_centroid(nz)
+  nz_pos <- st_point_on_surface(nz)
+  
+  tm_shape(nz) + 
+  tm_polygons() + 
+  tm_shape(nz_centroid) + 
+  tm_symbols(col = "red", alpha = 0.5) + 
+  tm_shape(nz_pos) + 
+  tm_symbols(col = "blue", alpha = 0.05)
+
+```
+
+
+#Simplification
+```{r}
+
+seine_simple <- st_simplify(seine, dTolerance = 2000)
+
+tm_shape(seine_simple) +
+  tm_lines()
+
+#you use the ful data set for analysis, but then when mapping you only use one part 
+
+
+```
+
+
